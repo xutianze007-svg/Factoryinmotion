@@ -1,0 +1,63 @@
+Machine Sight Reuse License 1.0
+
+Copyright (c) 2026 Zsolt Kacso / Whitespace
+
+This license applies to the original code and documentation in the
+kaolti/machine-sight repository (the "Software"). It does not apply to
+third-party libraries, fonts, or other third-party materials.
+
+1. Permission
+
+You may download, run, copy, study, modify, and reuse the Software for
+personal and commercial projects, including paid client work and products
+that incorporate the Software, subject to the conditions below.
+
+You may redistribute the Software, including modified source code, free
+of charge if you include this license and the copyright notice. Recipients
+receive the same permissions and conditions under this license.
+
+2. Visible attribution for commercial websites
+
+If you use the Software or a substantial portion of it in a commercial
+website or web application, that website or application must display
+legible, public-facing credit:
+
+    Based on Machine Sight by Zsolt Kacso / Whitespace
+
+The credit must include a clickable link to:
+https://github.com/kaolti/machine-sight
+
+A footer credit qualifies. A Credits or About page also qualifies if it
+can be reached through a clearly visible link on the website. Credit
+only in source comments, a README, or a hidden file does not qualify.
+
+Commercial use includes paid client work, use by a business to promote
+its products or services, and monetized websites or web applications.
+Visible website credit is optional for noncommercial use.
+
+3. No standalone resale
+
+You may not sell the Software, modified versions of it, or substantial
+portions of it as a standalone source-code download, template, asset
+pack, or substantially equivalent product. Charging for client work or
+a product that incorporates the Software is permitted under section 1,
+subject to the attribution requirement in section 2.
+
+4. Third-party materials
+
+Third-party libraries, fonts, and other materials retain their own
+licenses. This license grants no additional rights to those materials.
+You must comply with their applicable license requirements.
+
+5. No endorsement
+
+Attribution does not imply endorsement by Zsolt Kacso or Whitespace.
+
+6. Warranty and liability
+
+The Software is provided as is, without any warranty, including
+warranties of merchantability, fitness for a particular purpose, or
+noninfringement. To the extent permitted by applicable law, the author
+is not liable for claims, damages, or other liability arising from use,
+distribution, or other dealings in the Software.
+
