@@ -20,3 +20,12 @@
 }
 @media(min-width:761px) and (max-height:760px){.readout{padding:12px 15px}.panel-kicker{font-size:7px}.readout h2{font-size:23px;margin:8px 0 5px}.equipment-subtitle{font-size:10px}.parameters{margin:12px 0 8px}.parameters>div{padding:9px 0}.readout details{margin-top:9px}.readout summary{padding:10px 12px;min-height:36px}.structure-list>div{height:35px}.structure-list svg.part-study{width:32px;height:32px;flex-basis:32px}}
 @media(min-width:761px) and (max-width:1100px){.instructions{max-width:190px;white-space:normal}.instructions .motion-text{white-space:normal}}
+
+.controls select{pointer-events:auto;font:10px var(--mono);color:inherit;background:#efeee8;border:1px solid var(--line);border-radius:4px;padding:7px;max-width:120px;cursor:pointer}.controls select:focus-visible{outline:2px solid #368577;outline-offset:3px}@media(max-width:760px){.controls select{max-width:85px;font-size:9px;padding:4px}.controls button{padding:0 8px}}
+
+/* Keep the toolbar above the decorative scan layer. */
+#interface .controls{z-index:6}
+.controls select{height:40px;max-width:120px;border:1px solid #aab0a1;border-right:0;border-radius:0;padding:0 12px;background:transparent;font:11px 'Geist Variable',Arial,sans-serif;transition:background .15s,color .15s}
+.controls select:hover,.controls select:focus-visible{background:#121611;color:#fff}
+.controls select option{background:#efeee8;color:#111410}
+@media(max-width:760px){.controls select{height:38px;max-width:85px;font-size:10px;padding:0 6px}}

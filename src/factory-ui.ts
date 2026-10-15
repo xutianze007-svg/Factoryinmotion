@@ -8,11 +8,21 @@ export function mountFactoryUI(app: HTMLElement) {
   const ui = app.querySelector<HTMLElement>('#interface')!;
   const copy = app.querySelector<HTMLElement>('#scan-copy')!;
   installTextMotion(ui);
+  copy.innerHTML = ui.innerHTML;
+  // Interactive controls stay in one layer so the scan cannot duplicate or offset them.
+  copy.querySelector('.controls')?.remove();
+  const pairs = [...copy.querySelectorAll<HTMLElement>('[id]')].map(clone => ({ clone, source: ui.querySelector<HTMLElement>(`#${clone.id}`)! }));
+  for (const { clone } of pairs) clone.removeAttribute('id');
   let next = 0;
   return { update(time: number, grid: LensGrid, full: boolean) {
     if (time < next) return; next = time + .09;
-    copy.innerHTML = ui.innerHTML;
-    for (const e of copy.querySelectorAll('[id]')) e.removeAttribute('id');
+
+    for (const { clone, source } of pairs) {
+      if (!source.children.length && clone.textContent !== source.textContent) clone.textContent = source.textContent;
+      if (source.id === 'structure-list' && clone.innerHTML !== source.innerHTML) clone.innerHTML = source.innerHTML;
+      clone.className = source.className;
+      if (clone instanceof HTMLDetailsElement && source instanceof HTMLDetailsElement) clone.open = source.open;
+    }
     const inset = innerWidth <= 760 ? 8 : 14;
     const cell = grid.fineSize(); let path = '';
     for (let y = 0; y < innerHeight; y += cell) {

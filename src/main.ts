@@ -34,14 +34,21 @@ const amber = new THREE.LineBasicMaterial({ color: '#ffbd63', transparent: true,
 const machineSurface = new THREE.MeshBasicMaterial({ color: '#102b31', transparent: true, opacity: .38, depthWrite: false });
 const robots: { joints: THREE.Group[]; tip: THREE.Group; base: THREE.Group; index: number }[] = [];
 const rollers: THREE.Object3D[] = [];
+const geometryCache = new Map<string, THREE.BufferGeometry>();
+const edgesCache = new WeakMap<THREE.BufferGeometry, THREE.EdgesGeometry>();
+function sharedGeometry(key: string, create: () => THREE.BufferGeometry) {
+  let geometry = geometryCache.get(key);
+  if (!geometry) { geometry = create(); geometryCache.set(key, geometry); }
+  return geometry;
+}
 function part(g: THREE.BufferGeometry, parent: THREE.Object3D, pos: [number, number, number], mat = clay, technical = true) {
   const node = new THREE.Group(); node.position.set(...pos); parent.add(node);
   const mesh = new THREE.Mesh(g, mat); mesh.castShadow = true; mesh.receiveShadow = true; node.add(mesh);
-  if (technical) { const body = new THREE.Mesh(g, machineSurface); body.layers.set(1); node.add(body); const edge = new THREE.LineSegments(new THREE.EdgesGeometry(g, 28), cyan); edge.layers.set(1); node.add(edge); }
+  if (technical) { const body = new THREE.Mesh(g, machineSurface); body.layers.set(1); node.add(body); let edges = edgesCache.get(g); if (!edges) { edges = new THREE.EdgesGeometry(g, 28); edgesCache.set(g, edges); } const edge = new THREE.LineSegments(edges, cyan); edge.layers.set(1); node.add(edge); }
   return node;
 }
-function box(w: number, h: number, d: number, parent: THREE.Object3D, x: number, y: number, z: number, mat = clay, radius = .06) { return part(new RoundedBoxGeometry(w, h, d, 2, radius), parent, [x, y, z], mat); }
-function cylinder(r: number, h: number, parent: THREE.Object3D, x: number, y: number, z: number, mat = clay) { return part(new THREE.CylinderGeometry(r, r, h, 24), parent, [x, y, z], mat); }
+function box(w: number, h: number, d: number, parent: THREE.Object3D, x: number, y: number, z: number, mat = clay, radius = .06) { return part(sharedGeometry(`box:${w}:${h}:${d}:${radius}`, () => new RoundedBoxGeometry(w, h, d, 2, radius)), parent, [x, y, z], mat); }
+function cylinder(r: number, h: number, parent: THREE.Object3D, x: number, y: number, z: number, mat = clay) { return part(sharedGeometry(`cylinder:${r}:${h}`, () => new THREE.CylinderGeometry(r, r, h, 24)), parent, [x, y, z], mat); }
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), new THREE.MeshStandardMaterial({ color: '#efeee8', roughness: 1 })); floor.rotation.x = -Math.PI / 2; floor.position.y = -.55; floor.receiveShadow = true; scene.add(floor);
 box(32, .55, 21, scene, 0, -.25, 0, lightClay, .18);
 const gridHelper = new THREE.GridHelper(32, 32, '#22565c', '#163c42'); gridHelper.position.y = .05; gridHelper.layers.set(1); scene.add(gridHelper);
@@ -135,11 +142,31 @@ window.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDef
 window.addEventListener('keyup', e => { if (e.code === 'Space') slow = false; });
 window.addEventListener('blur', () => { slow = false; });
 const grid = new LensGrid();
-function resize() { camera.aspect = innerWidth / innerHeight; if (defaultView) camera.zoom = framingZoom(); camera.setViewOffset(innerWidth, innerHeight, innerWidth > 760 ? innerWidth * .07 : 0, innerWidth / innerHeight > 1.45 ? innerHeight * .035 : 0, innerWidth, innerHeight); camera.updateProjectionMatrix(); pipeline.setSize(innerWidth, innerHeight, Math.min(devicePixelRatio, 1.5)); }
+// Start conservatively; sustained slow frames lower GPU load without changing the model.
+let quality = 1;
+let sampleStart = 0, sampleFrames = 0, slowSamples = 0;
+const pixelRatios = [.75, 1, 1.5];
+const qualitySelect = document.createElement('select');
+qualitySelect.setAttribute('aria-label', 'Preview quality');
+qualitySelect.innerHTML = '<option value="auto">Auto quality</option><option value="0">Smooth</option><option value="1">Balanced</option><option value="2">High</option>';
+app.querySelector('.controls')!.prepend(qualitySelect);
+qualitySelect.onchange = () => { quality = qualitySelect.value === 'auto' ? 1 : Number(qualitySelect.value); slowSamples = 0; sampleStart = 0; resize(); };
+function measureQuality(now: number) {
+  if (!sampleStart) { sampleStart = now; sampleFrames = 0; }
+  sampleFrames++;
+  if (now - sampleStart < 2500) return;
+  const fps = sampleFrames * 1000 / (now - sampleStart);
+  slowSamples = fps < 42 ? slowSamples + 1 : 0;
+  if (qualitySelect.value === 'auto' && slowSamples >= 2 && quality > 0) { quality--; resize(); slowSamples = 0; }
+  sampleStart = now; sampleFrames = 0;
+}
+
+function resize() { camera.aspect = innerWidth / innerHeight; if (defaultView) camera.zoom = framingZoom(); camera.setViewOffset(innerWidth, innerHeight, innerWidth > 760 ? innerWidth * .07 : 0, innerWidth / innerHeight > 1.45 ? innerHeight * .035 : 0, innerWidth, innerHeight); camera.updateProjectionMatrix(); pipeline.setSize(innerWidth, innerHeight, Math.min(devicePixelRatio, pixelRatios[quality], Math.sqrt(2400000 / (innerWidth * innerHeight)))); }
 window.addEventListener('resize', resize); resize();
+let nextInspection = 0;
 const target = new THREE.Vector3();
 function frame(now: number) {
-  requestAnimationFrame(frame); const dt = Math.min((now - last) / 1000, .05); last = now; if (!paused) t += dt * (slow ? .2 : 1);
+  requestAnimationFrame(frame); if (document.hidden) { last = now; sampleStart = 0; return; } measureQuality(now); const dt = Math.min((now - last) / 1000, .05); last = now; if (!paused) t += dt * (slow ? .2 : 1);
   for (const [i, r] of rollers.entries()) r.rotation.y = t * (i < rollers.length / 2 ? 1 : -1) * 1.3 / .19;
   conveyorAnatomy.update(t);
   details.animate(t);
@@ -166,7 +193,7 @@ function frame(now: number) {
   }
   if (selected !== null) { const p = parcels[selected]; controls.target.lerp(p.root.position, 1 - Math.exp(-dt * 3)); cursor.copy(new THREE.Vector2(innerWidth / 2, innerHeight / 2)); }
   controls.update();
-  updateInspection(details, camera, cursor, presence > 0 || full, t, app);
+  if (now >= nextInspection) { updateInspection(details, camera, cursor, section && (presence > 0 || full), t, app); nextInspection = now + 100; }
   grid.resize(innerWidth, innerHeight, 24, 2);
   const radius = full ? Math.max(innerWidth, innerHeight) * 2 : Math.min(220, innerWidth * .23);
   grid.update(dt, { lensX: cursor.x, lensY: cursor.y, radius, presence: full || selected !== null ? 1 : presence, organic: .28, drift: .16, diamond: .1, jitter: .05, attack: 12, release: 7, processing: .12, time: t, regions: [], corridors: [], wave: null });
@@ -174,8 +201,8 @@ function frame(now: number) {
   const u = (k: string) => pipeline.composite.u(k);
   factoryUI.update(now / 1000, grid, full);
   u('uFull').value = full ? 1 : 0; u('uTime').value = t; u('uLens').value.set(cursor.x, cursor.y); u('uRadius').value = radius; u('uPresence').value = full ? 1 : presence; u('uGrowth').value = 1; u('uEdgeGlow').value = .65; u('uLattice').value = .3; u('uScanBoxes').value = 1; u('uGridReveal').value = 0; u('uEdge').value.set('#65dbc5');
-  pipeline.setPost({ ao: 1, tiltShift: .18, bloom: .45, bloomThreshold: 1, grain: .07, vignette: .15, exposure: 1, focusY: .55, aoRadius: 1.4, aoHalfRes: true });
-  pipeline.render(dt);
+  pipeline.setPost({ ao: quality === 0 ? 0 : 1, tiltShift: quality === 0 ? 0 : .18, bloom: .45, bloomThreshold: 1, grain: .07, vignette: .15, exposure: 1, focusY: .55, aoRadius: 1.4, aoHalfRes: true });
+  pipeline.render(dt, section, false);
   let labelCount = 0;
   for (const p of parcels) { const v = p.root.position.clone().add(new THREE.Vector3(0, 1.7, 0)).project(camera); const x = (v.x + 1) * innerWidth / 2, y = (1 - v.y) * innerHeight / 2; p.label.style.display = v.z < 1 && grid.coverage(x, y) > .6 && labelCount++ < 2 ? 'block' : 'none'; p.label.style.transform = `translate(${x}px,${y}px)`; p.label.textContent = `PKG-${String(p.id + 1).padStart(3, '0')} / ${p.picked ? 'TRANSFER' : '99.8%'}`; }
   app.querySelector('#units')!.textContent = String(Math.floor(t / 8) * 2).padStart(4, '0');

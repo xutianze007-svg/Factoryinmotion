@@ -239,6 +239,8 @@ export class Pipeline {
   readonly composite: LensCompositeEffect;
   private ao: N8AOPostPass;
   private tilt: TiltShiftEffect;
+  private tiltPass: EffectPass;
+  private shadowElapsed = 1;
   private bloom: BloomEffect;
   private vignette: VignetteEffect;
   private noise: NoiseEffect;
@@ -278,7 +280,8 @@ export class Pipeline {
     this.ao.setQualityMode('Medium');
     this.composer.addPass(this.ao);
     this.tilt = new TiltShiftEffect({ focusArea: 0.42, feather: 0.32, offset: 0 });
-    this.composer.addPass(new EffectPass(camera, this.tilt));
+    this.tiltPass = new EffectPass(camera, this.tilt);
+    this.composer.addPass(this.tiltPass);
     this.composite = new LensCompositeEffect(this.rtMachine.texture, this.rtOverlay.texture, this.stateTex);
     this.composer.addPass(new EffectPass(camera, this.composite));
     this.bloom = new BloomEffect({ intensity: 0.9, luminanceThreshold: 1.0, luminanceSmoothing: 0.35, mipmapBlur: true, radius: 0.72 });
@@ -327,6 +330,7 @@ export class Pipeline {
     this.ao.enabled = p.ao > 0.01;
     if (p.aoRadius != null && Math.abs(this.ao.configuration.aoRadius - p.aoRadius) > 0.05) this.ao.configuration.aoRadius = p.aoRadius;
     if (p.aoHalfRes != null && this.ao.configuration.halfRes !== p.aoHalfRes) this.ao.configuration.halfRes = p.aoHalfRes;
+    this.tiltPass.enabled = p.tiltShift > 0.01;
     this.tilt.focusArea = 0.42 + (1 - p.tiltShift) * 0.9;
     this.tilt.feather = 0.32;
     this.tilt.offset = 0.5 - p.focusY;
@@ -338,7 +342,7 @@ export class Pipeline {
     (this.tone as unknown as { exposure?: number }).exposure = p.exposure;
   }
 
-  render(dt: number) {
+  render(dt: number, machineVisible = true, overlayVisible = true) {
     const r = this.renderer;
     const cam = this.camera;
     // machine world
@@ -350,19 +354,21 @@ export class Pipeline {
     const fog = this.scene.fog;
     this.scene.background = null;
     this.scene.fog = null;
-    r.render(this.scene, cam);
+    if (machineVisible) r.render(this.scene, cam);
     // overlay (relations) — transparent
     cam.layers.set(LAYER_OVERLAY);
     r.setRenderTarget(this.rtOverlay);
     r.setClearColor(0x000000, 0);
     r.clear(true, true, false);
-    r.render(this.scene, cam);
+    if (overlayVisible) r.render(this.scene, cam);
     this.scene.background = bg;
     this.scene.fog = fog;
     r.setRenderTarget(null);
     // beauty + post (shadow casters are filtered by the camera's layers, so update here)
     cam.layers.set(LAYER_BEAUTY);
-    r.shadowMap.needsUpdate = true;
+    this.shadowElapsed += dt;
+    r.shadowMap.needsUpdate = this.shadowElapsed >= 1 / 30;
+    if (r.shadowMap.needsUpdate) this.shadowElapsed = 0;
     this.composer.render(dt);
   }
 
